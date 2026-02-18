@@ -10,9 +10,19 @@ import {
     ClipboardList
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, toggleSidebar, onItemClick }) => {
     const location = useLocation();
+    const { logout } = useAuth();
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+        } catch (error) {
+            console.error("Failed to sign out:", error);
+        }
+    };
 
     const menuItems = [
         { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -74,13 +84,14 @@ const Sidebar = ({ isOpen, toggleSidebar, onItemClick }) => {
                 })}
             </nav>
 
-            {/* Footer / User Profile placeholder */}
+            {/* Footer / Sign Out */}
             <div className="absolute bottom-8 left-0 w-full px-4">
-                <button className={`flex items-center w-full transition-all group ${isOpen ? 'p-3 rounded-xl' : 'p-3 justify-center rounded-2xl'
-                    } hover:bg-red-500/10 text-slate-400 hover:text-red-400`}>
+                <button
+                    onClick={handleLogout}
+                    className={`flex items-center w-full transition-all group ${isOpen ? 'p-3 rounded-xl' : 'p-3 justify-center rounded-2xl'} hover:bg-red-500/10 text-slate-400 hover:text-red-400`}
+                >
                     <LogOut size={24} className="shrink-0" />
-                    <span className={`ml-4 font-medium transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden hidden'
-                        }`}>
+                    <span className={`ml-4 font-medium transition-all duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden hidden'}`}>
                         Sign Out
                     </span>
                 </button>
