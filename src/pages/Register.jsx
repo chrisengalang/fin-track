@@ -40,15 +40,12 @@ export default function Register() {
 
             <div className="w-full max-w-md z-10">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center p-3 bg-blue-600 rounded-2xl shadow-xl shadow-blue-500/20 mb-6">
-                        <Wallet className="text-white" size={32} />
+                    <div className="inline-flex items-center justify-center p-3 bg-white rounded-3xl shadow-xl shadow-blue-500/10 mb-6 overflow-hidden w-24 h-24 mx-auto animate-in zoom-in-50 duration-500">
+                        <img src="/icon-192.png" alt="fintrack logo" className="w-full h-full object-cover" />
                     </div>
-                    <h1 className="text-4xl font-extrabold text-[var(--text-primary)] tracking-tight mb-2">
-                        Get Started
+                    <h1 className="text-5xl font-black text-[var(--text-primary)] tracking-tighter lowercase">
+                        fintrack
                     </h1>
-                    <p className="text-[var(--text-secondary)] font-medium">
-                        Join FinTrack to start tracking your finances
-                    </p>
                 </div>
 
                 <div className="enterprise-card p-8 lg:p-10 bg-[var(--bg-secondary)]/80 backdrop-blur-xl border border-[var(--border-color)]">

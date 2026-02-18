@@ -1,6 +1,6 @@
 {
-    "name": "FinTrack Personal Finance",
-    "short_name": "FinTrack",
+    "name": "fintrack personal finance",
+    "short_name": "fintrack",
     "description": "Premium personal finance tracking and budgeting.",
     "start_url": "/",
     "display": "standalone",

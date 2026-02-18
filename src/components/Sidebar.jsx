@@ -40,8 +40,8 @@ const Sidebar = ({ isOpen, toggleSidebar, onItemClick }) => {
             {/* Logo Area */}
             <div className={`flex items-center border-b border-slate-700/50 transition-all duration-300 ${isOpen ? 'justify-between p-6' : 'justify-center py-6 px-0'}`}>
                 {isOpen && (
-                    <h1 className="font-bold text-xl text-blue-400 animate-in fade-in duration-300 whitespace-nowrap">
-                        FinTrack
+                    <h1 className="font-bold text-2xl text-blue-400 animate-in fade-in duration-300 whitespace-nowrap lowercase">
+                        fintrack
                     </h1>
                 )}
                 <button
