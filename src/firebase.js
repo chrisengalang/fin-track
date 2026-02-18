@@ -4,12 +4,12 @@ import { getAuth } from "firebase/auth";
 
 // TODO: Replace with your actual Firebase project configuration
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAPVzq0VpyutUsT6o8S57_Im4x2rGP_hgM",
+    authDomain: "fin-track-chrisen.firebaseapp.com",
+    projectId: "fin-track-chrisen",
+    storageBucket: "fin-track-chrisen.firebasestorage.app",
+    messagingSenderId: "1098298677317",
+    appId: "1:1098298677317:web:92c466cbc9cdd009fc2b2c"
 };
 
 const app = initializeApp(firebaseConfig);

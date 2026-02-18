@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wallet, Receipt, Edit2, Check, X } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 function Budgets({ selectedMonth }) {
     const [budget, setBudget] = useState(null);
@@ -8,17 +9,18 @@ function Budgets({ selectedMonth }) {
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ name: '', amount: '' });
     const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
-        if (selectedMonth) fetchBudget();
-    }, [selectedMonth]);
+        if (selectedMonth && user) fetchBudget();
+    }, [selectedMonth, user]);
 
     const fetchBudget = async () => {
         setLoading(true);
         try {
             const month = selectedMonth.getMonth() + 1;
             const year = selectedMonth.getFullYear();
-            const response = await api.get('/budgets', { params: { month, year } });
+            const response = await api.get('/budgets', { userId: user.uid, params: { month, year } });
             setBudget(response.data);
         } catch (error) {
             if (error.response && error.response.status === 404) {
@@ -35,7 +37,7 @@ function Budgets({ selectedMonth }) {
         try {
             const month = selectedMonth.getMonth() + 1;
             const year = selectedMonth.getFullYear();
-            const response = await api.post('/budgets', { month, year, user: { id: 1 } }); // Default user
+            const response = await api.post('/budgets', { month, year }, { userId: user.uid });
             setBudget(response.data);
         } catch (error) {
             console.error("Error creating budget:", error);
@@ -46,7 +48,7 @@ function Budgets({ selectedMonth }) {
         try {
             const month = selectedMonth.getMonth() + 1;
             const year = selectedMonth.getFullYear();
-            const response = await api.post('/budgets/copy-previous', { month, year, user: { id: 1 } });
+            const response = await api.post('/budgets/copy-previous', { month, year }, { userId: user.uid });
             setBudget(response.data);
             alert("Items copied from previous month!");
         } catch (error) {
@@ -62,9 +64,9 @@ function Budgets({ selectedMonth }) {
         try {
             const itemToSave = {
                 ...newItem,
-                budget: { id: budget.id }
+                budgetId: budget.id
             };
-            const response = await api.post('/budget-items', itemToSave);
+            const response = await api.post('/budget-items', itemToSave, { userId: user.uid });
             const newItems = budget.budgetItems ? [...budget.budgetItems, response.data] : [response.data];
             setBudget({ ...budget, budgetItems: newItems });
             setNewItem({ name: '', amount: '' });
@@ -84,7 +86,7 @@ function Budgets({ selectedMonth }) {
 
     const handleUpdateItem = async (id) => {
         try {
-            const response = await api.put(`/budget-items/${id}`, editForm);
+            const response = await api.put(`/budget-items/${id}`, editForm, { userId: user.uid });
             const newItems = budget.budgetItems.map(item =>
                 item.id === id ? { ...item, name: response.data.name, amount: response.data.amount } : item
             );
@@ -98,7 +100,7 @@ function Budgets({ selectedMonth }) {
     const deleteItem = async (id) => {
         if (!window.confirm("Are you sure you want to delete this budget item?")) return;
         try {
-            await api.delete(`/budget-items/${id}`);
+            await api.delete(`/budget-items/${id}`, { userId: user.uid });
             const newItems = budget.budgetItems.filter(item => item.id !== id);
             setBudget({ ...budget, budgetItems: newItems });
         } catch (error) {
@@ -109,7 +111,7 @@ function Budgets({ selectedMonth }) {
     if (loading) return <div className="p-10 text-center text-[var(--text-secondary)]">Loading your budget...</div>;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl lg:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
@@ -120,39 +122,39 @@ function Budgets({ selectedMonth }) {
             </header>
 
             {!budget ? (
-                <div className="enterprise-card p-8 lg:p-16 text-center space-y-8 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)]">
-                    <div className="space-y-4">
-                        <div className="mx-auto w-16 h-16 lg:w-20 lg:h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500 shadow-inner">
-                            <Wallet size={32} />
+                <div className="enterprise-card p-6 sm:p-8 lg:p-16 text-center space-y-6 lg:space-y-8 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)]">
+                    <div className="space-y-3 sm:space-y-4">
+                        <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500 shadow-inner">
+                            <Wallet size={28} />
                         </div>
-                        <h3 className="text-xl lg:text-2xl font-bold text-[var(--text-primary)]">Start your budget month</h3>
-                        <p className="text-[var(--text-secondary)] max-w-md mx-auto text-sm lg:text-lg">
+                        <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-[var(--text-primary)]">Start your budget month</h3>
+                        <p className="text-[var(--text-secondary)] max-w-sm sm:max-w-md mx-auto text-xs sm:text-sm lg:text-lg">
                             Take control of your finances for {selectedMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}.
                         </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row justify-center gap-4 lg:gap-6">
+                    <div className="flex flex-col sm:flex-row justify-center gap-3 lg:gap-6">
                         <button
                             onClick={createBudgetHelper}
-                            className="enterprise-button-primary flex items-center justify-center space-x-2 px-6 lg:px-10"
+                            className="enterprise-button-primary flex items-center justify-center space-x-2 px-6 lg:px-10 py-3 sm:py-2.5"
                         >
-                            <span>🚀 Start Fresh</span>
+                            <span className="text-sm">🚀 Start Fresh</span>
                         </button>
                         <button
                             onClick={handleCopyPrevious}
-                            className="enterprise-button-secondary flex items-center justify-center space-x-2 px-6 lg:px-10"
+                            className="enterprise-button-secondary flex items-center justify-center space-x-2 px-6 lg:px-10 py-3 sm:py-2.5"
                         >
-                            <span>📋 Copy Last Month</span>
+                            <span className="text-sm">📋 Copy Last Month</span>
                         </button>
                     </div>
                 </div>
             ) : (
                 <>
-                    <section className="enterprise-card p-6 lg:p-8 bg-[var(--bg-secondary)] mb-10">
-                        <h3 className="text-lg font-bold text-[var(--text-primary)] mb-6">Add New Budget Item</h3>
-                        <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Item Name</label>
+                    <section className="enterprise-card p-5 sm:p-6 lg:p-8 bg-[var(--bg-secondary)] mb-8 sm:mb-10">
+                        <h3 className="text-base sm:text-lg font-bold text-[var(--text-primary)] mb-4 sm:mb-6">Add New Budget Item</h3>
+                        <form onSubmit={handleAddItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                            <div className="space-y-1.5 sm:space-y-2">
+                                <label className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Item Name</label>
                                 <input
                                     type="text"
                                     placeholder="e.g. Rent, Groceries"
@@ -162,8 +164,8 @@ function Budgets({ selectedMonth }) {
                                     required
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Monthly Amount</label>
+                            <div className="space-y-1.5 sm:space-y-2">
+                                <label className="text-[10px] sm:text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Monthly Amount</label>
                                 <input
                                     type="number"
                                     placeholder="0.00"
@@ -173,32 +175,32 @@ function Budgets({ selectedMonth }) {
                                     required
                                 />
                             </div>
-                            <div className="flex items-end md:col-span-2 lg:col-span-1">
-                                <button type="submit" className="enterprise-button-primary w-full">
+                            <div className="flex items-end md:col-span-2 lg:col-span-1 pt-2 sm:pt-0">
+                                <button type="submit" className="enterprise-button-primary w-full py-3 sm:py-2.5">
                                     Add Budget Item
                                 </button>
                             </div>
                         </form>
                     </section>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                         {budget.budgetItems && budget.budgetItems.map(item => (
-                            <div key={item.id} className="enterprise-card p-6 group hover:border-blue-500/50 transition-colors">
-                                <div className="flex justify-between items-start mb-6">
+                            <div key={item.id} className="enterprise-card p-5 group hover:border-blue-500/50 transition-colors">
+                                <div className="flex justify-between items-start mb-4 sm:mb-6">
                                     <div className="flex-1 mr-4">
                                         {editingId === item.id ? (
                                             <input
                                                 autoFocus
-                                                className="enterprise-input text-xl font-bold py-1 mb-1"
+                                                className="enterprise-input text-lg sm:text-xl font-bold py-1 mb-1"
                                                 value={editForm.name}
                                                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                                             />
                                         ) : (
-                                            <h3 className="font-bold text-xl text-[var(--text-primary)] truncate">{item.name}</h3>
+                                            <h3 className="font-bold text-lg sm:text-xl text-[var(--text-primary)] truncate">{item.name}</h3>
                                         )}
-                                        <span className="text-[var(--text-secondary)] text-xs font-medium uppercase tracking-widest mt-1 block">Expense Limit</span>
+                                        <span className="text-[var(--text-secondary)] text-[10px] font-medium uppercase tracking-widest mt-0.5 block">Expense Limit</span>
                                     </div>
-                                    <div className="flex space-x-1">
+                                    <div className="flex space-x-0.5 sm:space-x-1">
                                         {editingId === item.id ? (
                                             <>
                                                 <button onClick={() => handleUpdateItem(item.id)} className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors">
@@ -210,10 +212,10 @@ function Budgets({ selectedMonth }) {
                                             </>
                                         ) : (
                                             <>
-                                                <button onClick={() => startEditing(item)} className="p-2 text-[var(--text-secondary)] hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                                <button onClick={() => startEditing(item)} className="p-2 text-[var(--text-secondary)] hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
                                                     <Edit2 size={16} />
                                                 </button>
-                                                <button onClick={() => deleteItem(item.id)} className="p-2 text-[var(--text-secondary)] hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                                <button onClick={() => deleteItem(item.id)} className="p-2 text-[var(--text-secondary)] hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
                                                     <Receipt size={16} />
                                                 </button>
                                             </>
@@ -221,25 +223,25 @@ function Budgets({ selectedMonth }) {
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-baseline mb-2">
-                                        <span className="text-2xl font-black text-[var(--text-primary)]">${item.spent || 0}</span>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-[var(--text-secondary)] text-sm font-bold">Limit:</span>
+                                <div className="space-y-3 sm:space-y-4">
+                                    <div className="flex justify-between items-baseline mb-1.5 sm:mb-2">
+                                        <span className="text-xl sm:text-2xl font-black text-[var(--text-primary)]">${item.spent || 0}</span>
+                                        <div className="flex items-center space-x-1 sm:space-x-2">
+                                            <span className="text-[var(--text-secondary)] text-[10px] sm:text-sm font-bold">Limit:</span>
                                             {editingId === item.id ? (
                                                 <input
                                                     type="number"
-                                                    className="enterprise-input w-24 py-1 text-sm font-black"
+                                                    className="enterprise-input w-20 sm:w-24 py-1 text-xs sm:text-sm font-black"
                                                     value={editForm.amount}
                                                     onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
                                                 />
                                             ) : (
-                                                <span className="text-[var(--text-primary)] text-sm font-black">${item.amount}</span>
+                                                <span className="text-[var(--text-primary)] text-xs sm:text-sm font-black">${item.amount}</span>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="w-full bg-[var(--bg-primary)] rounded-full h-3 overflow-hidden shadow-inner border border-[var(--border-color)]">
+                                    <div className="w-full bg-[var(--bg-primary)] rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner border border-[var(--border-color)]">
                                         <div
                                             className={`h-full rounded-full transition-all duration-500 ${(item.spent || 0) > item.amount ? 'bg-rose-500' : 'bg-blue-600'
                                                 }`}
@@ -247,12 +249,12 @@ function Budgets({ selectedMonth }) {
                                         ></div>
                                     </div>
 
-                                    <div className="flex justify-between items-center pt-2">
-                                        <span className={`text-xs font-black uppercase px-2 py-1 rounded ${(item.spent || 0) > item.amount ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
+                                    <div className="flex justify-between items-center pt-1.5 sm:pt-2">
+                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${(item.spent || 0) > item.amount ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'
                                             }`}>
                                             {(item.spent || 0) > item.amount ? 'Over Limit' : 'On Track'}
                                         </span>
-                                        <span className="text-[var(--text-secondary)] text-xs font-bold italic">
+                                        <span className="text-[var(--text-secondary)] text-[10px] font-bold italic">
                                             ${Math.max(0, item.amount - (item.spent || 0)).toLocaleString()} left
                                         </span>
                                     </div>

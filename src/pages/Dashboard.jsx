@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Wallet, TrendingUp, TrendingDown, Receipt, ArrowRight, LayoutDashboard, PieChart as PieChartIcon, BarChart3 } from 'lucide-react';
 import { PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -10,12 +11,13 @@ function Dashboard({ selectedMonth }) {
     const [recentTransactions, setRecentTransactions] = useState([]);
     const [chartData, setChartData] = useState({ categories: [], budgetItems: [] });
     const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
-        if (selectedMonth) {
+        if (selectedMonth && user) {
             fetchDashboardData();
         }
-    }, [selectedMonth]);
+    }, [selectedMonth, user]);
 
     const fetchDashboardData = async () => {
         setLoading(true);
@@ -26,11 +28,15 @@ function Dashboard({ selectedMonth }) {
             // Fetch Budget for summaries and budget items chart
             let budget = null;
             try {
-                const res = await api.get('/budgets', { params: { month, year } });
+                const res = await api.get('/budgets', { userId: user.uid, params: { month, year } });
                 budget = res.data;
             } catch (e) {
                 if (e.response && e.response.status !== 404) console.error(e);
             }
+
+            // Fetch Transactions for Category Pie Chart
+            const transRes = await api.get('/transactions', { userId: user.uid, params: { month, year } });
+            const allTransactions = transRes.data;
 
             // Calculate totals
             let totalBudget = 0;
@@ -68,10 +74,6 @@ function Dashboard({ selectedMonth }) {
                 if (!a.isOverspent && b.isOverspent) return 1;
                 return a.percentLeft - b.percentLeft;
             });
-
-            // Fetch Transactions for Category Pie Chart
-            const transRes = await api.get('/transactions/user/1', { params: { month, year } });
-            const allTransactions = transRes.data;
 
             // Process data for charts
             const categoryMap = {};
@@ -150,7 +152,7 @@ function Dashboard({ selectedMonth }) {
     if (loading) return <div className="p-6">Loading dashboard...</div>;
 
     return (
-        <div className="space-y-6 lg:space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-2xl lg:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
                     Dashboard
@@ -160,43 +162,44 @@ function Dashboard({ selectedMonth }) {
                 </span>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-                {/* ... existing summary cards ... */}
-                <div className="enterprise-card p-6 lg:p-8 border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
+                <div className="enterprise-card p-5 sm:p-6 lg:p-8 border-l-4 border-l-emerald-500 hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start">
-                        <h3 className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest">Available Budget</h3>
+                        <h3 className="text-[var(--text-secondary)] text-[10px] sm:text-xs font-bold uppercase tracking-widest">Available Budget</h3>
                         <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
-                            <Wallet size={20} />
+                            <Wallet size={18} />
                         </div>
                     </div>
-                    <div className="flex items-baseline space-x-2 mt-4">
-                        <span className="text-4xl font-black text-[var(--text-primary)]">${summary.totalBudget.toLocaleString()}</span>
+                    <div className="flex items-baseline space-x-2 mt-3 sm:mt-4">
+                        <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--text-primary)]">${summary.totalBudget.toLocaleString()}</span>
                     </div>
                 </div>
 
-                <div className="enterprise-card p-8 border-l-4 border-l-rose-500 hover:shadow-md transition-shadow">
+                <div className="enterprise-card p-5 sm:p-6 lg:p-8 border-l-4 border-l-rose-500 hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start">
-                        <h3 className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest">Total Expenses</h3>
+                        <h3 className="text-[var(--text-secondary)] text-[10px] sm:text-xs font-bold uppercase tracking-widest">Total Expenses</h3>
                         <div className="p-2 bg-rose-500/10 rounded-lg text-rose-500">
-                            <TrendingUp size={20} />
+                            <TrendingUp size={18} />
                         </div>
                     </div>
-                    <div className="flex items-baseline space-x-2 mt-4">
-                        <span className={`text-4xl font-black ${summary.totalCurrent > summary.totalBudget ? "text-rose-600" : "text-[var(--text-primary)]"}`}>
+                    <div className="flex items-baseline space-x-2 mt-3 sm:mt-4">
+                        <span className={`text-2xl sm:text-3xl lg:text-4xl font-black ${summary.totalCurrent > summary.totalBudget ? "text-rose-600" : "text-[var(--text-primary)]"}`}>
                             ${summary.totalCurrent.toLocaleString()}
                         </span>
                     </div>
                 </div>
 
-                <div className="enterprise-card p-8 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                        <h3 className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest">Remaining Balance</h3>
-                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
-                            <TrendingDown size={20} />
+                <div className="enterprise-card p-5 sm:p-6 lg:p-8 border-l-4 border-l-blue-500 hover:shadow-md transition-shadow flex sm:col-span-2 lg:col-span-1">
+                    <div className="w-full">
+                        <div className="flex justify-between items-start">
+                            <h3 className="text-[var(--text-secondary)] text-[10px] sm:text-xs font-bold uppercase tracking-widest">Remaining Balance</h3>
+                            <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                                <TrendingDown size={18} />
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-baseline space-x-2 mt-4">
-                        <span className="text-4xl font-black text-[var(--text-primary)]">${summary.totalRemaining.toLocaleString()}</span>
+                        <div className="flex items-baseline space-x-2 mt-3 sm:mt-4">
+                            <span className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--text-primary)]">${summary.totalRemaining.toLocaleString()}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -209,7 +212,7 @@ function Dashboard({ selectedMonth }) {
                         </div>
                         <h3 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">Spending by Category</h3>
                     </div>
-                    <div className="h-[400px] p-6">
+                    <div className="h-[300px] sm:h-[350px] lg:h-[400px] p-4 sm:p-6">
                         {chartData.categories.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
@@ -251,7 +254,7 @@ function Dashboard({ selectedMonth }) {
                         </div>
                         <h3 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">Budget Progress (% Left)</h3>
                     </div>
-                    <div className="h-[400px] p-6">
+                    <div className="h-[300px] sm:h-[350px] lg:h-[400px] p-4 sm:p-6">
                         {chartData.budgetItems.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
@@ -310,7 +313,7 @@ function Dashboard({ selectedMonth }) {
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">Recent Activity</h3>
                     <button className="text-sm font-semibold text-blue-500 hover:text-blue-600 transition-colors">View All</button>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-b border-[var(--border-color)]">
@@ -335,16 +338,33 @@ function Dashboard({ selectedMonth }) {
                                     </td>
                                 </tr>
                             ))}
-                            {recentTransactions.length === 0 && (
-                                <tr>
-                                    <td colSpan="4" className="p-10 text-center text-[var(--text-secondary)] italic">
-                                        No recent transactions recorded.
-                                    </td>
-                                </tr>
-                            )}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Mobile View */}
+                <div className="md:hidden divide-y divide-[var(--border-color)]">
+                    {recentTransactions.map(t => (
+                        <div key={t.id} className="p-4 flex justify-between items-center bg-[var(--bg-secondary)]">
+                            <div className="flex flex-col space-y-1">
+                                <span className="text-sm font-bold text-[var(--text-primary)] line-clamp-1">{t.description}</span>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-[10px] text-[var(--text-secondary)] font-medium">{t.date}</span>
+                                    <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded-full font-bold uppercase">
+                                        {t.budgetItem ? t.budgetItem.name : (t.category ? t.category.name : '-')}
+                                    </span>
+                                </div>
+                            </div>
+                            <span className="text-sm font-black text-rose-500 shrink-0">-${t.amount?.toFixed(2)}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {recentTransactions.length === 0 && (
+                    <div className="p-10 text-center text-[var(--text-secondary)] italic">
+                        No recent transactions recorded.
+                    </div>
+                )}
             </section>
         </div>
     );

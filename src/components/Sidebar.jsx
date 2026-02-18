@@ -6,11 +6,12 @@ import {
     Tags,
     ChevronLeft,
     ChevronRight,
-    LogOut
+    LogOut,
+    ClipboardList
 } from 'lucide-react';
 import { useState } from 'react';
 
-const Sidebar = ({ isOpen, toggleSidebar }) => {
+const Sidebar = ({ isOpen, toggleSidebar, onItemClick }) => {
     const location = useLocation();
 
     const menuItems = [
@@ -18,6 +19,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { path: '/budgets', label: 'Budgets', icon: Wallet },
         { path: '/transactions', label: 'Transactions', icon: Receipt },
         { path: '/categories', label: 'Categories', icon: Tags },
+        { path: '/checklist', label: 'Checklist', icon: ClipboardList },
     ];
 
     return (
@@ -50,6 +52,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         <Link
                             key={item.path}
                             to={item.path}
+                            onClick={onItemClick}
                             className={`flex items-center transition-all group relative ${isOpen ? 'p-3 rounded-xl' : 'p-3 justify-center rounded-2xl'
                                 } ${isActive
                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'

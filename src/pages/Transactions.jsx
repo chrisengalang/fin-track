@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, ChevronUp, ChevronDown, Plus, X, Receipt, Wallet, Tags } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, Plus, X, Receipt, Wallet, Tags, Trash2, Edit2 } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 function Transactions({ selectedMonth }) {
     const [transactions, setTransactions] = useState([]);
@@ -9,26 +10,35 @@ function Transactions({ selectedMonth }) {
     const [formData, setFormData] = useState({
         description: '',
         amount: '',
-        date: new Date().toISOString().split('T')[0],
+        date: '',
         budgetItem: { id: '' },
-        category: { id: '' },
-        user: { id: 1 }
+        category: { id: 'system-uncategorized' }
     });
+    const { user } = useAuth();
 
     // Filter and Sort State
     const [filterText, setFilterText] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [filterBudgetItem, setFilterBudgetItem] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' });
+    const [loading, setLoading] = useState(false);
+    const [editingId, setEditingId] = useState(null);
 
     useEffect(() => {
-        if (selectedMonth) {
-            fetchTransactions();
-            fetchBudgetItems();
-            fetchCategories();
-            updateDefaultDate();
+        if (selectedMonth && user) {
+            const loadAllData = async () => {
+                setLoading(true);
+                await Promise.all([
+                    fetchTransactions(),
+                    fetchBudgetItems(),
+                    fetchCategories()
+                ]);
+                updateDefaultDate();
+                setLoading(false);
+            };
+            loadAllData();
         }
-    }, [selectedMonth]);
+    }, [selectedMonth, user]);
 
     const updateDefaultDate = () => {
         const today = new Date();
@@ -51,7 +61,7 @@ function Transactions({ selectedMonth }) {
         try {
             const month = selectedMonth.getMonth() + 1;
             const year = selectedMonth.getFullYear();
-            const res = await api.get('/transactions', { params: { month, year } });
+            const res = await api.get('/transactions', { userId: user.uid, params: { month, year } });
             setTransactions(res.data);
         } catch (error) { console.error(error); }
     };
@@ -60,7 +70,7 @@ function Transactions({ selectedMonth }) {
         try {
             const month = selectedMonth.getMonth() + 1;
             const year = selectedMonth.getFullYear();
-            const res = await api.get('/budgets', { params: { month, year } });
+            const res = await api.get('/budgets', { userId: user.uid, params: { month, year } });
             if (res.data && res.data.budgetItems) {
                 setBudgetItems(res.data.budgetItems);
             } else {
@@ -74,17 +84,52 @@ function Transactions({ selectedMonth }) {
 
     const fetchCategories = async () => {
         try {
-            const res = await api.get('/categories');
+            const res = await api.get('/categories', { userId: user.uid });
             setCategories(res.data);
         } catch (error) { console.error(error); }
     }
 
+    const handleEdit = (t) => {
+        setEditingId(t.id);
+        setFormData({
+            description: t.description,
+            amount: t.amount,
+            date: t.date,
+            budgetItem: { id: t.budgetItem?.id || '' },
+            category: { id: t.category?.id || '' }
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this transaction?")) return;
+        try {
+            await api.delete(`/transactions/${id}`, { userId: user.uid });
+            fetchTransactions();
+        } catch (error) { console.error("Error deleting transaction:", error); }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await api.post('/transactions', formData);
+            // Resolve names for denormalization
+            const selectedBudgetItem = budgetItems.find(b => b.id === formData.budgetItem.id);
+            const selectedCategory = categories.find(c => c.id === formData.category.id);
+
+            const payload = {
+                ...formData,
+                budgetItemName: selectedBudgetItem?.name || '',
+                categoryName: selectedCategory?.name || (formData.category.id === 'system-uncategorized' ? 'Uncategorized' : '')
+            };
+
+            if (editingId) {
+                await api.put(`/transactions/${editingId}`, payload, { userId: user.uid });
+            } else {
+                await api.post('/transactions', payload, { userId: user.uid });
+            }
             fetchTransactions();
-            setFormData(prev => ({ ...prev, description: '', amount: '' }));
+            setFormData(prev => ({ ...prev, description: '', amount: '', category: { id: 'system-uncategorized' } }));
+            setEditingId(null);
         } catch (error) { console.error(error); }
     };
 
@@ -102,9 +147,9 @@ function Transactions({ selectedMonth }) {
         let aValue = a[sortConfig.key];
         let bValue = b[sortConfig.key];
 
-        // Handle nested objects
-        if (sortConfig.key === 'category') aValue = a.category?.name || '';
-        if (sortConfig.key === 'budgetItem') aValue = b.budgetItem?.name || '';
+        // Handle nested objects or denormalized names
+        if (sortConfig.key === 'category') aValue = a.categoryName || a.category?.name || '';
+        if (sortConfig.key === 'budgetItem') aValue = a.budgetItemName || a.budgetItem?.name || '';
 
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
@@ -118,8 +163,10 @@ function Transactions({ selectedMonth }) {
         return matchesText && matchesCategory && matchesBudgetItem;
     });
 
+    if (loading && transactions.length === 0) return <div className="p-10 text-center text-[var(--text-secondary)] italic">Loading transactions...</div>;
+
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl lg:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
@@ -129,8 +176,20 @@ function Transactions({ selectedMonth }) {
                 </div>
             </header>
 
-            <section className="enterprise-card p-6 lg:p-8 bg-[var(--bg-secondary)]">
-                <h3 className="text-lg font-bold text-[var(--text-primary)] mb-6">Record Transaction</h3>
+            <section className="enterprise-card p-6 lg:p-8 bg-[var(--bg-secondary)] border-l-4 border-l-blue-500">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                        {editingId ? "Update Transaction" : "Record Transaction"}
+                    </h3>
+                    {editingId && (
+                        <button
+                            onClick={() => { setEditingId(null); setFormData(prev => ({ ...prev, description: '', amount: '' })); }}
+                            className="text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-widest flex items-center gap-1.5 transition-colors"
+                        >
+                            <X size={14} /> Cancel Edit
+                        </button>
+                    )}
+                </div>
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 items-end">
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Description</label>
@@ -164,9 +223,9 @@ function Transactions({ selectedMonth }) {
                         <select
                             value={formData.budgetItem.id}
                             onChange={e => setFormData({ ...formData, budgetItem: { id: e.target.value } })}
-                            className="enterprise-input appearance-none" required
+                            className="enterprise-input appearance-none"
                         >
-                            <option value="">Select Item</option>
+                            <option value="">Unassigned</option>
                             {budgetItems.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     </div>
@@ -177,35 +236,34 @@ function Transactions({ selectedMonth }) {
                             onChange={e => setFormData({ ...formData, category: { id: e.target.value } })}
                             className="enterprise-input appearance-none"
                         >
-                            <option value="">Select Category</option>
                             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
                     </div>
-                    <button type="submit" className="enterprise-button-primary w-full">
-                        Save
+                    <button type="submit" className={`enterprise-button-primary w-full ${editingId ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}>
+                        {editingId ? "Update" : "Save"}
                     </button>
                 </form>
             </section>
 
             <section className="enterprise-card bg-[var(--bg-secondary)] overflow-hidden">
-                <div className="p-6 border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex flex-wrap gap-6 items-center">
-                    <div className="relative flex-1 min-w-[300px]">
+                <div className="p-4 sm:p-6 border-b border-[var(--border-color)] bg-[var(--bg-primary)] flex flex-wrap gap-4 sm:gap-6 items-center">
+                    <div className="relative flex-1 min-w-full sm:min-w-[300px]">
                         <input
                             type="text"
                             placeholder="Filter by description..."
                             value={filterText}
                             onChange={e => setFilterText(e.target.value)}
-                            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-full px-12 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-full px-10 sm:px-12 py-2 sm:py-2.5 text-base focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]">
-                            <Search size={18} />
+                            <Search size={16} />
                         </div>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-2 sm:gap-4 w-full sm:w-auto">
                         <select
                             value={filterCategory}
                             onChange={e => setFilterCategory(e.target.value)}
-                            className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-4 py-2 text-sm text-[var(--text-primary)] outline-none"
+                            className="flex-1 sm:flex-none bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm text-[var(--text-primary)] outline-none"
                         >
                             <option value="">All Categories</option>
                             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -213,7 +271,7 @@ function Transactions({ selectedMonth }) {
                         <select
                             value={filterBudgetItem}
                             onChange={e => setFilterBudgetItem(e.target.value)}
-                            className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-4 py-2 text-sm text-[var(--text-primary)] outline-none"
+                            className="flex-1 sm:flex-none bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm text-[var(--text-primary)] outline-none"
                         >
                             <option value="">All Items</option>
                             {budgetItems.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -221,13 +279,13 @@ function Transactions({ selectedMonth }) {
                     </div>
                     <button
                         onClick={() => { setFilterText(''); setFilterCategory(''); setFilterBudgetItem(''); }}
-                        className="text-xs font-bold text-blue-500 hover:text-blue-600 uppercase tracking-widest transition-colors"
+                        className="w-full sm:w-auto text-[10px] sm:text-xs font-bold text-blue-500 hover:text-blue-600 uppercase tracking-widest transition-colors py-1 sm:py-0"
                     >
                         Clear Filters
                     </button>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="hidden lg:block overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-b border-[var(--border-color)]">
@@ -243,9 +301,8 @@ function Transactions({ selectedMonth }) {
                                 <th className="p-6 text-xs font-bold uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors" onClick={() => requestSort('category')}>
                                     Category {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="p-6 text-right text-xs font-bold uppercase tracking-wider cursor-pointer hover:text-blue-500 transition-colors" onClick={() => requestSort('amount')}>
-                                    Amount {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
+                                <th className="p-6 text-right text-xs font-bold uppercase tracking-wider">Amount</th>
+                                <th className="p-6 text-right text-xs font-bold uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border-color)]">
@@ -255,29 +312,78 @@ function Transactions({ selectedMonth }) {
                                     <td className="p-6 text-sm font-bold text-[var(--text-primary)]">{t.description}</td>
                                     <td className="p-6">
                                         <span className="px-3 py-1 bg-slate-500/10 text-slate-500 rounded-full text-xs font-black uppercase tracking-tighter">
-                                            {t.budgetItem?.name || '-'}
+                                            {t.budgetItemName || t.budgetItem?.name || '-'}
                                         </span>
                                     </td>
                                     <td className="p-6">
                                         <span className="px-3 py-1 bg-blue-500/10 text-blue-500 rounded-full text-xs font-black uppercase tracking-tighter">
-                                            {t.category?.name || '-'}
+                                            {t.categoryName || t.category?.name || '-'}
                                         </span>
                                     </td>
                                     <td className="p-6 text-right">
                                         <span className="text-sm font-black text-rose-500">-${t.amount?.toFixed(2)}</span>
                                     </td>
-                                </tr>
-                            ))}
-                            {filteredTransactions.length === 0 && (
-                                <tr>
-                                    <td colSpan="5" className="p-20 text-center text-[var(--text-secondary)] italic">
-                                        No transactions found matching your filters.
+                                    <td className="p-6 text-right space-x-2">
+                                        <button
+                                            onClick={() => handleEdit(t)}
+                                            className="p-2 text-[var(--text-secondary)] hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                            title="Edit Transaction"
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(t.id)}
+                                            className="p-2 text-[var(--text-secondary)] hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                            title="Delete Transaction"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </td>
                                 </tr>
-                            )}
+                            ))}
                         </tbody>
                     </table>
                 </div>
+
+                {/* Mobile/Tablet Card View */}
+                <div className="lg:hidden divide-y divide-[var(--border-color)]">
+                    {filteredTransactions.map(t => (
+                        <div key={t.id} className="p-4 sm:p-5 flex justify-between items-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-primary)] transition-colors">
+                            <div className="flex flex-col space-y-1.5 flex-1 pr-4">
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">{t.date}</span>
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase border ${t.budgetItem || t.budgetItemName ? "border-slate-500/20 text-slate-500 bg-slate-500/5" : "border-blue-500/20 text-blue-500 bg-blue-500/5"}`}>
+                                        {t.budgetItemName || t.budgetItem?.name || t.categoryName || t.category?.name || 'General'}
+                                    </span>
+                                </div>
+                                <span className="text-sm sm:text-base font-bold text-[var(--text-primary)] leading-tight">{t.description}</span>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                                <div className="text-right">
+                                    <span className="text-base font-black text-rose-500">-${t.amount?.toFixed(2)}</span>
+                                </div>
+                                <button
+                                    onClick={() => handleEdit(t)}
+                                    className="p-2 text-[var(--text-secondary)] hover:text-blue-500 bg-[var(--bg-primary)] rounded-lg transition-colors border border-[var(--border-color)]"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(t.id)}
+                                    className="p-2 text-[var(--text-secondary)] hover:text-rose-500 bg-[var(--bg-primary)] rounded-lg transition-colors border border-[var(--border-color)]"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {filteredTransactions.length === 0 && (
+                    <div className="p-20 text-center text-[var(--text-secondary)] italic">
+                        No transactions found matching your filters.
+                    </div>
+                )}
             </section>
         </div>
     );
